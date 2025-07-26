@@ -2,6 +2,8 @@
 
 Resource and Details about DJI Tello Drone
 
+![Tello](tello.jpg)
+
 ## Table of Contents
 
 - [Programming](#programming)
@@ -21,15 +23,26 @@ Resource and Details about DJI Tello Drone
 
 ## Programming
 
+Tello SDK Manual:
+- https://dl-cdn.ryzerobotics.com/downloads/tello/0228/Tello+SDK+Readme.pdf
+- https://terra-1-g.djicdn.com/2d4dce68897a46b19fc717f3576b7c6a/Tello%20%E7%BC%96%E7%A8%8B%E7%9B%B8%E5%85%B3/For%20Tello/Tello%20SDK%20Documentation%20EN_1.3_1122.pdf
+
 Python SDK for Tello - https://github.com/dji-sdk/Tello-Python
 
 - This contains Tello wrapper class for interacting with the DJI Tello drone using Python.
 
 Simulator - https://github.com/Fireline-Science/tello_sim
 
+Other Resources:
+- https://tello.oneoffcoder.com/resources.html
+
+
 ---
 
 ## Technical Details
+
+- Connect to the Tello WiFi network and have an IP in the 192.168.10.0/24 range.
+- Tello itself has an IP of 192.168.10.1. 
 
 ### Communication
 
