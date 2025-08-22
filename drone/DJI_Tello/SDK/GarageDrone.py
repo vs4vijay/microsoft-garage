@@ -74,7 +74,7 @@ class GarageDrone:
     
     def send_command(self, command: str) -> bool:
         """Send command to Tello drone"""
-        if not self.is_connected:
+        if command is not "command" and not self.is_connected:
             logger.warning("Not connected to drone")
             return False
             
