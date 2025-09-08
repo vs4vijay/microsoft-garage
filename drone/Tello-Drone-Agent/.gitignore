@@ -29,6 +29,12 @@ ENV/
 # Environment Variables
 .env
 
+# Captured drone images
+images/
+*.jpg
+*.jpeg
+*.png
+
 # IDE
 .vscode/
 .idea/

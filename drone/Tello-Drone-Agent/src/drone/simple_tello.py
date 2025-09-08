@@ -6,6 +6,8 @@ This provides a clean interface while leveraging the mature djitellopy library.
 import logging
 import cv2
 import numpy as np
+import threading
+import time
 from typing import Optional, Callable
 try:
     from djitellopy import Tello
@@ -26,12 +28,20 @@ class SimpleTello:
         self.is_connected = False
         self.video_enabled = False
         
+        # Keepalive thread management
+        self.keepalive_thread = None
+        self.keepalive_stop_event = threading.Event()
+        
     def connect(self) -> bool:
         """Connect to Tello drone."""
         try:
             self.logger.info("Connecting to Tello...")
             self.tello.connect()
             self.is_connected = True
+            
+            # Start keepalive thread
+            self._start_keepalive_thread()
+            
             self.logger.info("✅ Tello connected successfully!")
             return True
         except Exception as e:
@@ -42,6 +52,9 @@ class SimpleTello:
     def close(self):
         """Close connection to Tello."""
         try:
+            # Stop keepalive thread first
+            self._stop_keepalive_thread()
+            
             if self.video_enabled:
                 self.streamoff()
             if self.is_connected:
@@ -277,3 +290,42 @@ class SimpleTello:
         except Exception as e:
             self.logger.error(f"Emergency error: {e}")
             return False
+    
+    def _start_keepalive_thread(self):
+        """Start the keepalive thread to send periodic keepalive commands."""
+        try:
+            if self.keepalive_thread is not None and self.keepalive_thread.is_alive():
+                return  # Thread already running
+            
+            self.keepalive_stop_event.clear()
+            self.keepalive_thread = threading.Thread(target=self._keepalive_worker, daemon=True)
+            self.keepalive_thread.start()
+        except Exception as e:
+            self.logger.error(f"❌ Error starting keepalive thread: {e}")
+    
+    def _stop_keepalive_thread(self):
+        """Stop the keepalive thread."""
+        try:
+            if self.keepalive_thread is not None:
+                self.keepalive_stop_event.set()
+                self.keepalive_thread.join(timeout=1.0)  # Wait up to 1 second
+                self.keepalive_thread = None
+        except Exception as e:
+            self.logger.error(f"❌ Error stopping keepalive thread: {e}")
+    
+    def _keepalive_worker(self):
+        """Worker function for the keepalive thread."""
+        
+        while not self.keepalive_stop_event.is_set():
+            try:
+                if self.is_connected:
+                    self.logger.info(f"Current Battery Percentage:{self.tello.send_command_with_return('battery?')}%")
+                else:
+                    break  # Connection lost, exit thread
+            except Exception as e:
+                self.logger.warning(f"⚠️ Keepalive error: {e}")
+                # Continue trying even if there's an error
+            
+            # Wait 10 seconds or until stop event is set
+            if self.keepalive_stop_event.wait(timeout=12.0):
+                break  # Stop event was set
