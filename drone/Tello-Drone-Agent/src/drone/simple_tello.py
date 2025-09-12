@@ -229,6 +229,172 @@ class SimpleTello:
             self.logger.error(f"Rotate counter-clockwise error: {e}")
             return False
     
+    # Curve movement commands
+    def curve_xyz_speed(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, speed: int) -> bool:
+        """Fly to x2 y2 z2 in a curve via x1 y1 z1. Speed defines the traveling speed in cm/s.
+        
+        Both points are relative to the current position.
+        The current position and both points must form a circle arc.
+        If the arc radius is not within the range of 0.5-10 meters, it raises an Exception.
+        x1/x2, y1/y2, z1/z2 can't both be between -20-20 at the same time, but can both be 0.
+        
+        Args:
+            x1: -500 to 500 (cm) - First waypoint X
+            y1: -500 to 500 (cm) - First waypoint Y  
+            z1: -500 to 500 (cm) - First waypoint Z
+            x2: -500 to 500 (cm) - Final destination X
+            y2: -500 to 500 (cm) - Final destination Y
+            z2: -500 to 500 (cm) - Final destination Z
+            speed: 10-60 (cm/s) - Travel speed
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if not self.is_connected:
+                return False
+            self.tello.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+            return True
+        except Exception as e:
+            self.logger.error(f"Curve movement error: {e}")
+            return False
+    
+    def curve_right_arc(self, radius: int, angle: int = 90, speed: int = 30) -> bool:
+        """Fly in a rightward curve arc.
+        
+        Args:
+            radius: Arc radius in cm (50-500)
+            angle: Arc angle in degrees (45-180), default 90°
+            speed: Travel speed in cm/s (10-60), default 30
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Calculate curve points for a right arc
+            import math
+            angle_rad = math.radians(angle)
+            
+            # Waypoint (middle of arc)
+            x1 = int(radius * math.sin(angle_rad / 2))
+            y1 = int(radius * (1 - math.cos(angle_rad / 2)))
+            z1 = 0
+            
+            # Final point (end of arc)
+            x2 = int(radius * math.sin(angle_rad))
+            y2 = int(radius * (1 - math.cos(angle_rad)))
+            z2 = 0
+            
+            return self.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+        except Exception as e:
+            self.logger.error(f"Right arc curve error: {e}")
+            return False
+    
+    def curve_left_arc(self, radius: int, angle: int = 90, speed: int = 30) -> bool:
+        """Fly in a leftward curve arc.
+        
+        Args:
+            radius: Arc radius in cm (50-500)
+            angle: Arc angle in degrees (45-180), default 90°
+            speed: Travel speed in cm/s (10-60), default 30
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Calculate curve points for a left arc (mirror of right arc)
+            import math
+            angle_rad = math.radians(angle)
+            
+            # Waypoint (middle of arc)
+            x1 = int(-radius * math.sin(angle_rad / 2))
+            y1 = int(radius * (1 - math.cos(angle_rad / 2)))
+            z1 = 0
+            
+            # Final point (end of arc)
+            x2 = int(-radius * math.sin(angle_rad))
+            y2 = int(radius * (1 - math.cos(angle_rad)))
+            z2 = 0
+            
+            return self.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+        except Exception as e:
+            self.logger.error(f"Left arc curve error: {e}")
+            return False
+    
+    def curve_forward_right(self, forward: int, right: int, speed: int = 30) -> bool:
+        """Fly in a smooth curve forward and to the right.
+        
+        Args:
+            forward: Forward distance in cm (50-400)
+            right: Right distance in cm (50-400)
+            speed: Travel speed in cm/s (10-60), default 30
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Simple curve: waypoint at 1/3, final at full distance
+            x1 = right // 3
+            y1 = forward // 3
+            z1 = 0
+            
+            x2 = right
+            y2 = forward
+            z2 = 0
+            
+            return self.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+        except Exception as e:
+            self.logger.error(f"Forward-right curve error: {e}")
+            return False
+    
+    def curve_forward_left(self, forward: int, left: int, speed: int = 30) -> bool:
+        """Fly in a smooth curve forward and to the left.
+        
+        Args:
+            forward: Forward distance in cm (50-400)
+            left: Left distance in cm (50-400)
+            speed: Travel speed in cm/s (10-60), default 30
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            # Simple curve: waypoint at 1/3, final at full distance
+            x1 = -left // 3  # Negative for left
+            y1 = forward // 3
+            z1 = 0
+            
+            x2 = -left  # Negative for left
+            y2 = forward
+            z2 = 0
+            
+            return self.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+        except Exception as e:
+            self.logger.error(f"Forward-left curve error: {e}")
+            return False
+    
+    # Advanced movement commands
+    def go_xyz_speed(self, x: int, y: int, z: int, speed: int) -> bool:
+        """Fly to x y z relative to the current position with specified speed.
+        
+        Args:
+            x: -500 to 500 (cm) - X displacement
+            y: -500 to 500 (cm) - Y displacement  
+            z: -500 to 500 (cm) - Z displacement
+            speed: 10-100 (cm/s) - Travel speed
+            
+        Returns:
+            bool: True if successful, False otherwise
+        """
+        try:
+            if not self.is_connected:
+                return False
+            self.tello.go_xyz_speed(x, y, z, speed)
+            return True
+        except Exception as e:
+            self.logger.error(f"Go XYZ error: {e}")
+            return False
+    
     # Status commands
     def get_temperature(self) -> int:
         """Get drone temperature."""

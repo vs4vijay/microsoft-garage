@@ -149,8 +149,13 @@ class RealtimeDroneAgent:
             "move_down": self.drone_controller.move_down,
             "rotate_clockwise": self.drone_controller.rotate_clockwise,
             "rotate_counter_clockwise": self.drone_controller.rotate_counter_clockwise,
+            "curve_xyz_speed": self.drone_controller.curve_xyz_speed,
+            "curve_right_arc": self.drone_controller.curve_right_arc,
+            "curve_left_arc": self.drone_controller.curve_left_arc,
+            "curve_forward_right": self.drone_controller.curve_forward_right,
+            "curve_forward_left": self.drone_controller.curve_forward_left,
+            "go_xyz_speed": self.drone_controller.go_xyz_speed,
             "get_drone_status": self.drone_controller.get_drone_status,
-            "emergency_stop": self.drone_controller.emergency_stop,
             "capture_and_analyze_image": self._capture_and_analyze_image
         }
     
@@ -202,29 +207,22 @@ class RealtimeDroneAgent:
                 "instructions": """You are an intelligent real-time drone controller assistant. You can do simple movements or complex maneuvers by moving in multiple steps
 
 🚁 EXECUTION STYLE:
-- Execute multi-step commands smoothly: "move forward 50cm then turn right" should flow naturally
-- Don't ask for confirmation or stop between normal steps (≤100cm movements)
-- Only pause if you detect genuine safety risks or distances >100cm
+- Execute multi-step commands smoothly: "move forward 50cm then turn right" should flow naturally without any stop
+- Don't ask for confirmation or stop between normal steps
+- Only pause if you detect genuine safety risks or distances >300cm
 - Process command sequences like: "take off, move forward 80cm, turn left 90 degrees, land"
 - Full rotation is allowed, no need to pause or complete in smaller steps
+- When asked to move while captuing, capture images every 1 sec and check for obstacles before moving next step 
 
 🎙️ COMMUNICATION:
-- Announce what you're starting: "Executing your sequence: moving forward, then turning right"
-- If you are announcing before starting, wait for announcement to complete before executing.
-- Give brief status updates during long sequences: "Forward complete, now turning right"
-- Announce completion: "Sequence complete - moved forward 80cm and turned right 90 degrees"
+- Give brief status updates only when asked
+- Dont announce any result of any operations or movements performed unless i ask for status
 - Be conversational but efficient and as short as possible
 
-🔒 SAFETY (when to pause):
-- Distances over 100cm: "That's a long distance, should I proceed?"
-- Potential obstacles: "I should check the camera first"
-- Complex sequences with >4 steps: "That's a complex sequence, shall I start?"
-- Emergency words: Stop immediately if user says "stop", "wait", "emergency"
 
 🚁 DRONE CONTROL:
 - Take off and land the drone safely
-- Move the drone in all directions (forward, backward, up, down)
-- Never move the drone left or right, instead rotate it and move in that direction. 
+- Move the drone in all directions (forward, backward, up, down, left, right) 
 - Rotate the drone clockwise and counter-clockwise  
 - Get real-time drone status (battery, height, flight state)
 - Capture and analyze live camera images from the drone
@@ -268,7 +266,7 @@ Execute normal movement commands (≤100cm) in smooth sequences without asking p
                                     "type": "integer",
                                     "description": "Distance in centimeters (20-100cm recommended)",
                                     "minimum": 20,
-                                    "maximum": 100
+                                    "maximum": 300
                                 }
                             },
                             "required": ["distance"]
@@ -285,7 +283,7 @@ Execute normal movement commands (≤100cm) in smooth sequences without asking p
                                     "type": "integer",
                                     "description": "Distance in centimeters (20-100cm)",
                                     "minimum": 20,
-                                    "maximum": 100
+                                    "maximum": 300
                                 }
                             },
                             "required": ["distance"]
@@ -417,9 +415,195 @@ Execute normal movement commands (≤100cm) in smooth sequences without asking p
                     },
                     {
                         "type": "function",
-                        "name": "emergency_stop",
-                        "description": "Emergency stop - immediately stop all movement and hover",
-                        "parameters": {"type": "object", "properties": {}}
+                        "name": "curve_xyz_speed",
+                        "description": "Fly in a curve from current position to specified coordinates with speed control",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "x1": {
+                                    "type": "integer",
+                                    "description": "First waypoint X coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "y1": {
+                                    "type": "integer", 
+                                    "description": "First waypoint Y coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "z1": {
+                                    "type": "integer",
+                                    "description": "First waypoint Z coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "x2": {
+                                    "type": "integer",
+                                    "description": "Final position X coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "y2": {
+                                    "type": "integer",
+                                    "description": "Final position Y coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "z2": {
+                                    "type": "integer",
+                                    "description": "Final position Z coordinate in cm (-300 to 300)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-60)",
+                                    "minimum": 10,
+                                    "maximum": 60
+                                }
+                            },
+                            "required": ["x1", "y1", "z1", "x2", "y2", "z2", "speed"]
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "curve_right_arc",
+                        "description": "Fly in a right-turning arc pattern with specified radius and distance",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "radius": {
+                                    "type": "integer",
+                                    "description": "Arc radius in cm (50-200)",
+                                    "minimum": 50,
+                                    "maximum": 200
+                                },
+                                "distance": {
+                                    "type": "integer",
+                                    "description": "Forward distance in cm (50-300)",
+                                    "minimum": 50,
+                                    "maximum": 300
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-60)",
+                                    "minimum": 10,
+                                    "maximum": 60
+                                }
+                            },
+                            "required": ["radius", "distance", "speed"]
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "curve_left_arc",
+                        "description": "Fly in a left-turning arc pattern with specified radius and distance",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "radius": {
+                                    "type": "integer",
+                                    "description": "Arc radius in cm (50-200)",
+                                    "minimum": 50,
+                                    "maximum": 200
+                                },
+                                "distance": {
+                                    "type": "integer",
+                                    "description": "Forward distance in cm (50-300)",
+                                    "minimum": 50,
+                                    "maximum": 300
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-60)",
+                                    "minimum": 10,
+                                    "maximum": 60
+                                }
+                            },
+                            "required": ["radius", "distance", "speed"]
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "curve_forward_right",
+                        "description": "Fly in a gentle curve forward and to the right",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "distance": {
+                                    "type": "integer",
+                                    "description": "Forward distance in cm (80-250)",
+                                    "minimum": 80,
+                                    "maximum": 250
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-50)",
+                                    "minimum": 10,
+                                    "maximum": 50
+                                }
+                            },
+                            "required": ["distance", "speed"]
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "curve_forward_left",
+                        "description": "Fly in a gentle curve forward and to the left",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "distance": {
+                                    "type": "integer",
+                                    "description": "Forward distance in cm (80-250)",
+                                    "minimum": 80,
+                                    "maximum": 250
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-50)",
+                                    "minimum": 10,
+                                    "maximum": 50
+                                }
+                            },
+                            "required": ["distance", "speed"]
+                        }
+                    },
+                    {
+                        "type": "function",
+                        "name": "go_xyz_speed",
+                        "description": "Fly directly to specified coordinates relative to current position with speed control",
+                        "parameters": {
+                            "type": "object",
+                            "properties": {
+                                "x": {
+                                    "type": "integer",
+                                    "description": "X coordinate in cm (-300 to 300, positive=right)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "y": {
+                                    "type": "integer",
+                                    "description": "Y coordinate in cm (-300 to 300, positive=forward)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "z": {
+                                    "type": "integer",
+                                    "description": "Z coordinate in cm (-300 to 300, positive=up)",
+                                    "minimum": -300,
+                                    "maximum": 300
+                                },
+                                "speed": {
+                                    "type": "integer",
+                                    "description": "Flight speed in cm/s (10-100)",
+                                    "minimum": 10,
+                                    "maximum": 100
+                                }
+                            },
+                            "required": ["x", "y", "z", "speed"]
+                        }
                     }
                 ],
                 "tool_choice": "auto",
@@ -601,37 +785,37 @@ Execute normal movement commands (≤100cm) in smooth sequences without asking p
                 
                 await self.websocket.send(json.dumps(response))
                 
-                # Check if this is a vision analysis that's already handling its own response
-                if result.startswith("[PROCESSING]"):
-                    self.logger.info(f"🔄 {function_name} handling its own response - skipping duplicate trigger")
-                else:
-                    # More reliable speech triggering with delay and explicit message
-                    self.logger.info(f"🎙️ Triggering speech response for: {function_name}")
+                # # Check if this is a vision analysis that's already handling its own response
+                # if result.startswith("[PROCESSING]"):
+                #     self.logger.info(f"🔄 {function_name} handling its own response - skipping duplicate trigger")
+                # else:
+                #     # More reliable speech triggering with delay and explicit message
+                #     self.logger.info(f"🎙️ Triggering speech response for: {function_name}")
                     
-                    # Small delay to ensure function result is processed
-                    await asyncio.sleep(0.1)
+                #     # Small delay to ensure function result is processed
+                #     await asyncio.sleep(0.1)
                     
-                    # Send a conversation item that forces speech generation
-                    speech_prompt = {
-                        "type": "conversation.item.create",
-                        "item": {
-                            "type": "message",
-                            "role": "user", 
-                            "content": [
-                                {
-                                    "type": "input_text",
-                                    "text": f"Please confirm the result of {function_name}: {result}"
-                                }
-                            ]
-                        }
-                    }
-                    await self.websocket.send(json.dumps(speech_prompt))
+                #     # Send a conversation item that forces speech generation
+                #     speech_prompt = {
+                #         "type": "conversation.item.create",
+                #         "item": {
+                #             "type": "message",
+                #             "role": "user", 
+                #             "content": [
+                #                 {
+                #                     "type": "input_text",
+                #                     "text": f"Please confirm the result of {function_name}: {result}"
+                #                 }
+                #             ]
+                #         }
+                #     }
+                #     await self.websocket.send(json.dumps(speech_prompt))
                     
-                    # Now trigger response generation
-                    response_request = {
-                        "type": "response.create"
-                    }
-                    await self.websocket.send(json.dumps(response_request))
+                #     # Now trigger response generation
+                #     response_request = {
+                #         "type": "response.create"
+                #     }
+                #     await self.websocket.send(json.dumps(response_request))
                 
             except Exception as e:
                 self.logger.error(f"❌ Function execution error: {e}")

@@ -683,7 +683,7 @@ You are cautious, methodical, and always prioritize safety over speed.""",
         if self.vision_only:
             # Simulate image analysis for testing
             analysis_results = {
-                "obstacles": "Clear path ahead for 2 meters. Wall visible in distance. No immediate obstacles.",
+                "obstacles": "There is a chair 200 cm in front. No immediate obstacles.",
                 "objects": "Table with laptop visible ahead. Chair to the right. No people detected.",
                 "navigation": "Safe to move forward 50cm. Room appears spacious. Good lighting conditions.",
                 "specific_object": f"Looking for {object_description}: Object not clearly visible in current view. May need to rotate or move closer.",

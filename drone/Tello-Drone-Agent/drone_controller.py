@@ -210,6 +210,137 @@ class DroneController:
         except Exception as e:
             return f"Counter-clockwise rotation error: {str(e)}"
     
+    # Curve movement functions
+    async def curve_xyz_speed(self, x1: int, y1: int, z1: int, x2: int, y2: int, z2: int, speed: int, **kwargs) -> str:
+        """Fly in a curve via waypoint to destination."""
+        self.logger.info(f"🌊 Curve movement: waypoint({x1},{y1},{z1}) → destination({x2},{y2},{z2}) at {speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform curve movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Curve movement completed: waypoint({x1},{y1},{z1}) → destination({x2},{y2},{z2})"
+        
+        try:
+            success = self.drone.curve_xyz_speed(x1, y1, z1, x2, y2, z2, speed)
+            if success:
+                self.drone_state.height = self.drone.get_height()
+                self.drone_state.battery = self.drone.get_battery()
+                return f"Curve movement completed - height: {self.drone_state.height}cm, battery: {self.drone_state.battery}%"
+            else:
+                return "Curve movement failed"
+        except Exception as e:
+            return f"Curve movement error: {str(e)}"
+    
+    async def curve_right_arc(self, radius: int, angle: int = 90, speed: int = 30, **kwargs) -> str:
+        """Fly in a rightward arc."""
+        self.logger.info(f"🌊➡️ Right arc: radius={radius}cm, angle={angle}°, speed={speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform arc movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Right arc completed: {angle}° arc with {radius}cm radius"
+        
+        try:
+            success = self.drone.curve_right_arc(radius, angle, speed)
+            if success:
+                return f"Right arc completed: {angle}° arc with {radius}cm radius"
+            else:
+                return "Right arc movement failed"
+        except Exception as e:
+            return f"Right arc movement error: {str(e)}"
+    
+    async def curve_left_arc(self, radius: int, angle: int = 90, speed: int = 30, **kwargs) -> str:
+        """Fly in a leftward arc."""
+        self.logger.info(f"🌊⬅️ Left arc: radius={radius}cm, angle={angle}°, speed={speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform arc movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Left arc completed: {angle}° arc with {radius}cm radius"
+        
+        try:
+            success = self.drone.curve_left_arc(radius, angle, speed)
+            if success:
+                return f"Left arc completed: {angle}° arc with {radius}cm radius"
+            else:
+                return "Left arc movement failed"
+        except Exception as e:
+            return f"Left arc movement error: {str(e)}"
+    
+    async def curve_forward_right(self, forward: int, right: int, speed: int = 30, **kwargs) -> str:
+        """Fly in a smooth curve forward and right."""
+        self.logger.info(f"🌊↗️ Forward-right curve: forward={forward}cm, right={right}cm, speed={speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform curve movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Forward-right curve completed: {forward}cm forward, {right}cm right"
+        
+        try:
+            success = self.drone.curve_forward_right(forward, right, speed)
+            if success:
+                return f"Forward-right curve completed: {forward}cm forward, {right}cm right"
+            else:
+                return "Forward-right curve failed"
+        except Exception as e:
+            return f"Forward-right curve error: {str(e)}"
+    
+    async def curve_forward_left(self, forward: int, left: int, speed: int = 30, **kwargs) -> str:
+        """Fly in a smooth curve forward and left."""
+        self.logger.info(f"🌊↖️ Forward-left curve: forward={forward}cm, left={left}cm, speed={speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform curve movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Forward-left curve completed: {forward}cm forward, {left}cm left"
+        
+        try:
+            success = self.drone.curve_forward_left(forward, left, speed)
+            if success:
+                return f"Forward-left curve completed: {forward}cm forward, {left}cm left"
+            else:
+                return "Forward-left curve failed"
+        except Exception as e:
+            return f"Forward-left curve error: {str(e)}"
+    
+    async def go_xyz_speed(self, x: int, y: int, z: int, speed: int, **kwargs) -> str:
+        """Fly directly to XYZ coordinates with specified speed."""
+        self.logger.info(f"🎯 Direct movement: ({x},{y},{z}) at {speed}cm/s")
+        
+        if not self.drone_state.is_flying:
+            return "Cannot perform direct movement - drone is not flying! Use takeoff first."
+        
+        self.drone_state.movement_count += 1
+        
+        if self.vision_only:
+            return f"Direct movement completed to ({x},{y},{z})"
+        
+        try:
+            success = self.drone.go_xyz_speed(x, y, z, speed)
+            if success:
+                self.drone_state.height = self.drone.get_height()
+                self.drone_state.battery = self.drone.get_battery()
+                return f"Direct movement completed - height: {self.drone_state.height}cm, battery: {self.drone_state.battery}%"
+            else:
+                return "Direct movement failed"
+        except Exception as e:
+            return f"Direct movement error: {str(e)}"
+    
     async def get_drone_status(self, **kwargs) -> str:
         """Get current drone status."""
         if not self.vision_only:

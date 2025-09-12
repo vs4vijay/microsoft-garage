@@ -33,7 +33,7 @@ class VisionAnalyzer:
         
         # Simulation responses for vision-only mode
         self.simulation_analyses = {
-            "obstacles": "Clear path ahead for 2 meters. Wall visible in distance. No immediate obstacles detected.",
+            "obstacles": "a chair 200 cm ahead.",
             "objects": "I can see a desk with computer monitor and laptop. Some cables and office equipment visible. No people in view.",
             "navigation": "Room appears spacious with good lighting. Safe to move forward up to 1.5 meters before encountering furniture.",
             "landing_spot": "Current area has flat surface suitable for landing. No obstacles directly below."
