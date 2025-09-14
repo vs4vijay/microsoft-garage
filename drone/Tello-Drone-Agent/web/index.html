@@ -1,0 +1,367 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Drone Command Center</title>
+    <link rel="stylesheet" href="style.css">
+    <link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css" rel="stylesheet">
+</head>
+<body>
+    <div class="app-container">
+        <!-- Header -->
+        <header class="header">
+            <div class="header-left">
+                <i class="fas fa-helicopter"></i>
+                <h1>Drone Command Center</h1>
+            </div>
+            <div class="header-center">
+                <div class="connection-status" id="connectionStatus">
+                    <i class="fas fa-circle"></i>
+                    <span>Disconnected</span>
+                </div>
+            </div>
+            <div class="header-right">
+                <button class="btn btn-danger" id="emergencyStop">
+                    <i class="fas fa-stop"></i>
+                    EMERGENCY STOP
+                </button>
+                <button class="btn btn-secondary" id="settingsBtn">
+                    <i class="fas fa-cog"></i>
+                </button>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <div class="main-content">
+            <!-- Left Panel: Video Feed & Controls -->
+            <div class="left-panel">
+                <!-- Video Feed -->
+                <div class="video-section">
+                    <div class="video-header">
+                        <h3>Live Camera Feed</h3>
+                        <div class="video-controls">
+                            <button class="btn btn-sm" id="toggleCamera">
+                                <i class="fas fa-video"></i>
+                            </button>
+                            <button class="btn btn-sm" id="takeSnapshot">
+                                <i class="fas fa-camera"></i>
+                            </button>
+                            <button class="btn btn-sm" id="recordToggle">
+                                <i class="fas fa-record-vinyl"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="video-container">
+                        <video id="videoFeed" autoplay muted playsinline></video>
+                        <div class="video-overlay">
+                            <div class="crosshair"></div>
+                            <div class="video-info">
+                                <span id="videoResolution">--</span>
+                                <span id="videoFps">-- FPS</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual Controls -->
+                <div class="controls-section">
+                    <h3>Manual Controls</h3>
+                    <div class="control-grid">
+                        <!-- Movement Controls -->
+                        <div class="movement-controls">
+                            <div class="control-row">
+                                <button class="control-btn" data-command="takeoff">
+                                    <i class="fas fa-plane-departure"></i>
+                                    Takeoff
+                                </button>
+                                <button class="control-btn" data-command="move_up">
+                                    <i class="fas fa-arrow-up"></i>
+                                    Up
+                                </button>
+                                <button class="control-btn" data-command="land">
+                                    <i class="fas fa-plane-arrival"></i>
+                                    Land
+                                </button>
+                            </div>
+                            <div class="control-row">
+                                <button class="control-btn" data-command="move_left">
+                                    <i class="fas fa-arrow-left"></i>
+                                    Left
+                                </button>
+                                <button class="control-btn" data-command="move_down">
+                                    <i class="fas fa-arrow-down"></i>
+                                    Down
+                                </button>
+                                <button class="control-btn" data-command="move_right">
+                                    <i class="fas fa-arrow-right"></i>
+                                    Right
+                                </button>
+                            </div>
+                            <div class="control-row">
+                                <button class="control-btn" data-command="move_back">
+                                    <i class="fas fa-arrow-down"></i>
+                                    Back
+                                </button>
+                                <button class="control-btn" data-command="move_forward">
+                                    <i class="fas fa-arrow-up"></i>
+                                    Forward
+                                </button>
+                                <button class="control-btn" data-command="hover">
+                                    <i class="fas fa-pause"></i>
+                                    Hover
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Rotation Controls -->
+                        <div class="rotation-controls">
+                            <button class="control-btn" data-command="rotate_left">
+                                <i class="fas fa-undo"></i>
+                                Rotate Left
+                            </button>
+                            <button class="control-btn" data-command="rotate_right">
+                                <i class="fas fa-redo"></i>
+                                Rotate Right
+                            </button>
+                        </div>
+
+                        <!-- Distance Slider -->
+                        <div class="distance-control">
+                            <label for="distanceSlider">Distance: <span id="distanceValue">30</span>cm</label>
+                            <input type="range" id="distanceSlider" min="20" max="100" value="30">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Mission Planner -->
+                <div class="mission-section">
+                    <h3>Mission Planner</h3>
+                    <div class="mission-controls">
+                        <select id="missionType">
+                            <option value="patrol">Patrol Pattern</option>
+                            <option value="circle">Circle Pattern</option>
+                            <option value="square">Square Pattern</option>
+                            <option value="waypoints">Custom Waypoints</option>
+                        </select>
+                        <button class="btn" id="startMission">
+                            <i class="fas fa-play"></i>
+                            Start Mission
+                        </button>
+                        <button class="btn" id="pauseMission">
+                            <i class="fas fa-pause"></i>
+                            Pause
+                        </button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Chat & Status -->
+            <div class="right-panel">
+                <!-- Chat Interface -->
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h3>Drone Assistant</h3>
+                        <div class="chat-controls">
+                            <button class="btn btn-sm" id="voiceToggle">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button class="btn btn-sm" id="clearChat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message system">
+                            <div class="message-content">
+                                <i class="fas fa-robot"></i>
+                                Welcome to Drone Command Center! I'm your AI assistant. You can type or speak your commands.
+                            </div>
+                            <div class="message-time">Just now</div>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <div class="input-container">
+                            <input type="text" id="messageInput" placeholder="Type your command or question...">
+                            <button id="sendMessage">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button id="voiceInput" class="voice-btn">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                        </div>
+                        <div class="voice-indicator" id="voiceIndicator">
+                            <div class="voice-animation">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <span>Listening...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Status Dashboard -->
+                <div class="status-section">
+                    <h3>Drone Status</h3>
+                    <div class="status-grid">
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-battery-three-quarters"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Battery</span>
+                                <span class="status-value" id="batteryLevel">--</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-ruler-vertical"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Altitude</span>
+                                <span class="status-value" id="altitude">--</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-tachometer-alt"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Speed</span>
+                                <span class="status-value" id="speed">--</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-compass"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Heading</span>
+                                <span class="status-value" id="heading">--</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-plane"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Flight Mode</span>
+                                <span class="status-value" id="flightMode">Grounded</span>
+                            </div>
+                        </div>
+                        <div class="status-item">
+                            <div class="status-icon">
+                                <i class="fas fa-wifi"></i>
+                            </div>
+                            <div class="status-info">
+                                <span class="status-label">Signal</span>
+                                <span class="status-value" id="signalStrength">--</span>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Flight Log -->
+                <div class="log-section">
+                    <h3>Flight Log</h3>
+                    <div class="log-messages" id="logMessages">
+                        <div class="log-entry">
+                            <span class="log-time">--:--:--</span>
+                            <span class="log-message">System initialized</span>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Settings Modal -->
+    <div class="modal" id="settingsModal">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h3>Settings</h3>
+                <button class="modal-close" id="closeSettings">
+                    <i class="fas fa-times"></i>
+                </button>
+            </div>
+            <div class="modal-body">
+                <div class="setting-group">
+                    <h4>Drone Configuration</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="realDroneMode">
+                            Real Drone Mode (requires --real-drone flag)
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label for="droneIP">Drone IP Address:</label>
+                        <input type="text" id="droneIP" value="192.168.10.1">
+                    </div>
+                </div>
+                
+                <div class="setting-group">
+                    <h4>Camera Settings</h4>
+                    <div class="setting-item">
+                        <label for="cameraSource">Camera Source:</label>
+                        <select id="cameraSource">
+                            <option value="drone">Drone Camera</option>
+                            <option value="webcam">Webcam</option>
+                        </select>
+                    </div>
+                    <div class="setting-item">
+                        <label for="videoQuality">Video Quality:</label>
+                        <select id="videoQuality">
+                            <option value="720p">720p</option>
+                            <option value="480p">480p</option>
+                            <option value="360p">360p</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h4>Audio Settings</h4>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="speechOutput" checked>
+                            Enable Speech Output
+                        </label>
+                    </div>
+                    <div class="setting-item">
+                        <label>
+                            <input type="checkbox" id="speechInput" checked>
+                            Enable Speech Input
+                        </label>
+                    </div>
+                </div>
+
+                <div class="setting-group">
+                    <h4>Safety Settings</h4>
+                    <div class="setting-item">
+                        <label for="maxAltitude">Max Altitude (cm):</label>
+                        <input type="number" id="maxAltitude" value="300" min="50" max="500">
+                    </div>
+                    <div class="setting-item">
+                        <label for="lowBatteryWarning">Low Battery Warning (%):</label>
+                        <input type="number" id="lowBatteryWarning" value="20" min="10" max="50">
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn btn-secondary" id="cancelSettings">Cancel</button>
+                <button class="btn btn-primary" id="saveSettings">Save Settings</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Loading Overlay -->
+    <div class="loading-overlay" id="loadingOverlay">
+        <div class="loading-spinner">
+            <i class="fas fa-helicopter fa-spin"></i>
+            <p>Connecting to Drone Command Center...</p>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+</body>
+</html>

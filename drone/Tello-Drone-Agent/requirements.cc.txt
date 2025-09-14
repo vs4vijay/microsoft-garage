@@ -1,0 +1,18 @@
+# Drone Command Center Requirements
+# Includes web server, real-time communication, and video streaming
+
+# Async and networking
+websockets>=11.0
+aiofiles>=23.0.0
+
+# Web server and real-time communication
+fastapi>=0.104.0
+uvicorn[standard]>=0.24.0
+python-multipart>=0.0.6
+
+# Video streaming and processing
+av>=10.0.0  # For advanced video processing
+
+# Additional utilities
+aiohttp>=3.9.0  # For HTTP client functionality
+jinja2>=3.1.0   # For template rendering if needed
