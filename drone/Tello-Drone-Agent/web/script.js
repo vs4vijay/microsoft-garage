@@ -53,6 +53,8 @@ class DroneCommandCenter {
         
         // Modal elements
         this.settingsModal = document.getElementById('settingsModal');
+        this.flightLogsOverlay = document.getElementById('flightLogsOverlay');
+        this.overlayLogMessages = document.getElementById('overlayLogMessages');
     }
 
     initializeControlsState() {
@@ -72,6 +74,7 @@ class DroneCommandCenter {
         // Header buttons
         document.getElementById('emergencyStop').addEventListener('click', () => this.emergencyStop());
         document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
+        document.getElementById('flightLogsBtn').addEventListener('click', () => this.openFlightLogs());
 
         // Video controls
         document.getElementById('toggleCamera').addEventListener('click', () => this.toggleCamera());
@@ -116,10 +119,20 @@ class DroneCommandCenter {
         document.getElementById('cancelSettings').addEventListener('click', () => this.closeSettings());
         document.getElementById('saveSettings').addEventListener('click', () => this.saveSettings());
 
+        // Flight logs overlay
+        document.getElementById('closeFlightLogs').addEventListener('click', () => this.closeFlightLogs());
+
         // Close modal when clicking outside
         this.settingsModal.addEventListener('click', (e) => {
             if (e.target === this.settingsModal) {
                 this.closeSettings();
+            }
+        });
+
+        // Close flight logs overlay when clicking outside
+        this.flightLogsOverlay.addEventListener('click', (e) => {
+            if (e.target === this.flightLogsOverlay) {
+                this.closeFlightLogs();
             }
         });
 
@@ -611,6 +624,20 @@ class DroneCommandCenter {
         logEntry.appendChild(messageSpan);
         this.logMessages.appendChild(logEntry);
         
+        // Also add to overlay if it's open
+        if (this.flightLogsOverlay.classList.contains('active')) {
+            const overlayLogEntry = logEntry.cloneNode(true);
+            this.overlayLogMessages.appendChild(overlayLogEntry);
+            
+            // Keep only last 50 log entries in overlay
+            while (this.overlayLogMessages.children.length > 50) {
+                this.overlayLogMessages.removeChild(this.overlayLogMessages.firstChild);
+            }
+            
+            // Scroll overlay to bottom
+            this.overlayLogMessages.scrollTop = this.overlayLogMessages.scrollHeight;
+        }
+        
         // Keep only last 50 log entries
         while (this.logMessages.children.length > 50) {
             this.logMessages.removeChild(this.logMessages.firstChild);
@@ -668,6 +695,34 @@ class DroneCommandCenter {
         });
     }
 
+    openFlightLogs() {
+        this.updateFlightLogsOverlay();
+        this.flightLogsOverlay.classList.add('active');
+    }
+
+    closeFlightLogs() {
+        this.flightLogsOverlay.classList.remove('active');
+    }
+
+    updateFlightLogsOverlay() {
+        // Copy all log entries from the main log to the overlay
+        const mainLogMessages = this.logMessages;
+        const overlayLogContainer = this.overlayLogMessages;
+        
+        // Clear existing entries in overlay
+        overlayLogContainer.innerHTML = '';
+        
+        // Copy all entries from main log
+        const logEntries = mainLogMessages.querySelectorAll('.log-entry');
+        logEntries.forEach(entry => {
+            const clonedEntry = entry.cloneNode(true);
+            overlayLogContainer.appendChild(clonedEntry);
+        });
+        
+        // Scroll to bottom to show latest entries
+        overlayLogContainer.scrollTop = overlayLogContainer.scrollHeight;
+    }
+
     loadSettings() {
         const defaultSettings = {
             realDroneMode: false,
@@ -685,14 +740,24 @@ class DroneCommandCenter {
     }
 
     handleKeyboardShortcuts(e) {
-        // Emergency stop with Escape key
+        // Emergency stop with Escape key, but also close modals if open
         if (e.key === 'Escape') {
+            if (this.flightLogsOverlay.classList.contains('active')) {
+                this.closeFlightLogs();
+                return;
+            }
+            if (this.settingsModal.classList.contains('active')) {
+                this.closeSettings();
+                return;
+            }
             this.emergencyStop();
             return;
         }
         
-        // Only handle shortcuts if not typing in input fields
-        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA') {
+        // Only handle shortcuts if not typing in input fields and no modals are open
+        if (e.target.tagName === 'INPUT' || e.target.tagName === 'TEXTAREA' ||
+            this.flightLogsOverlay.classList.contains('active') ||
+            this.settingsModal.classList.contains('active')) {
             return;
         }
         
@@ -700,6 +765,9 @@ class DroneCommandCenter {
             case ' ': // Spacebar for voice input
                 e.preventDefault();
                 this.toggleVoiceInput();
+                break;
+            case 'f': // F key for flight logs
+                this.openFlightLogs();
                 break;
             case 't':
                 this.executeManualCommand('takeoff');
