@@ -19,6 +19,8 @@ class DroneCommandCenter {
         // Hide loading overlay after initialization
         setTimeout(() => {
             document.getElementById('loadingOverlay').classList.add('hidden');
+            // Initialize notification badge as hidden
+            this.logNotificationBadge.classList.add('hidden');
         }, 2000);
     }
 
@@ -55,6 +57,15 @@ class DroneCommandCenter {
         this.settingsModal = document.getElementById('settingsModal');
         this.flightLogsOverlay = document.getElementById('flightLogsOverlay');
         this.overlayLogMessages = document.getElementById('overlayLogMessages');
+        
+        // Notification elements
+        this.logNotificationBadge = document.getElementById('logNotificationBadge');
+        this.tickerNotification = document.getElementById('tickerNotification');
+        this.tickerMessage = document.getElementById('tickerMessage');
+        
+        // Notification state
+        this.unreadLogCount = 0;
+        this.isFlightLogsOpen = false;
     }
 
     initializeControlsState() {
@@ -74,6 +85,7 @@ class DroneCommandCenter {
         // Header buttons
         document.getElementById('emergencyStop').addEventListener('click', () => this.emergencyStop());
         document.getElementById('settingsBtn').addEventListener('click', () => this.openSettings());
+        document.getElementById('flightLogsBtn').addEventListener('click', () => this.openFlightLogs());
         document.getElementById('flightLogsBtn').addEventListener('click', () => this.openFlightLogs());
 
         // Video controls
@@ -121,6 +133,9 @@ class DroneCommandCenter {
 
         // Flight logs overlay
         document.getElementById('closeFlightLogs').addEventListener('click', () => this.closeFlightLogs());
+
+        // Ticker notification
+        document.getElementById('tickerClose').addEventListener('click', () => this.hideTicker());
 
         // Close modal when clicking outside
         this.settingsModal.addEventListener('click', (e) => {
@@ -645,6 +660,13 @@ class DroneCommandCenter {
         
         // Scroll to bottom
         this.logMessages.scrollTop = this.logMessages.scrollHeight;
+        
+        // Handle notifications (only for non-initial system messages)
+        if (!this.isFlightLogsOpen && message !== 'System initialized') {
+            this.unreadLogCount++;
+            this.updateNotificationBadge();
+            this.showTicker(message);
+        }
     }
 
     clearChat() {
@@ -698,10 +720,17 @@ class DroneCommandCenter {
     openFlightLogs() {
         this.updateFlightLogsOverlay();
         this.flightLogsOverlay.classList.add('active');
+        this.isFlightLogsOpen = true;
+        
+        // Mark all logs as read
+        this.unreadLogCount = 0;
+        this.updateNotificationBadge();
+        this.hideTicker();
     }
 
     closeFlightLogs() {
         this.flightLogsOverlay.classList.remove('active');
+        this.isFlightLogsOpen = false;
     }
 
     updateFlightLogsOverlay() {
@@ -804,6 +833,38 @@ class DroneCommandCenter {
             const url = URL.createObjectURL(blob);
             this.videoFeed.src = url;
         }
+    }
+
+    updateNotificationBadge() {
+        if (this.unreadLogCount > 0) {
+            this.logNotificationBadge.textContent = this.unreadLogCount > 99 ? '99+' : this.unreadLogCount;
+            this.logNotificationBadge.classList.remove('hidden');
+            this.logNotificationBadge.classList.add('new-message');
+            
+            // Remove animation class after animation completes
+            setTimeout(() => {
+                this.logNotificationBadge.classList.remove('new-message');
+            }, 600);
+        } else {
+            this.logNotificationBadge.classList.add('hidden');
+        }
+    }
+
+    showTicker(message) {
+        // Update ticker message
+        this.tickerMessage.textContent = message;
+        
+        // Show ticker
+        this.tickerNotification.classList.add('show');
+        
+        // Auto-hide after 4 seconds
+        setTimeout(() => {
+            this.hideTicker();
+        }, 4000);
+    }
+
+    hideTicker() {
+        this.tickerNotification.classList.remove('show');
     }
 }
 

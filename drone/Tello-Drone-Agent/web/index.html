@@ -25,6 +25,7 @@
                 <button class="btn btn-secondary" id="flightLogsBtn">
                     <i class="fas fa-list-alt"></i>
                     Flight Logs
+                    <span class="notification-badge" id="logNotificationBadge">0</span>
                 </button>
                 <button class="btn btn-danger" id="emergencyStop">
                     <i class="fas fa-stop"></i>
@@ -283,6 +284,17 @@
                 </div>
                 </div>
             </div>
+        </div>
+    </div>
+
+    <!-- Ticker Notification -->
+    <div class="ticker-notification" id="tickerNotification">
+        <div class="ticker-content">
+            <i class="fas fa-info-circle"></i>
+            <span class="ticker-message" id="tickerMessage">New flight log entry</span>
+            <button class="ticker-close" id="tickerClose">
+                <i class="fas fa-times"></i>
+            </button>
         </div>
     </div>
 

@@ -78,6 +78,103 @@ body {
     display: flex;
     align-items: center;
     gap: 10px;
+    position: relative;
+}
+
+/* Notification Badge */
+.notification-badge {
+    position: absolute;
+    top: -8px;
+    right: -8px;
+    background: linear-gradient(135deg, #ff4757 0%, #c44569 100%);
+    color: white;
+    border-radius: 12px;
+    padding: 2px 6px;
+    font-size: 10px;
+    font-weight: 600;
+    min-width: 18px;
+    height: 18px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    animation: pulse 2s infinite;
+    z-index: 10;
+}
+
+.notification-badge.hidden {
+    display: none;
+}
+
+.notification-badge.new-message {
+    animation: bounce 0.6s ease-in-out;
+}
+
+@keyframes bounce {
+    0%, 20%, 60%, 100% { transform: translateY(0); }
+    40% { transform: translateY(-10px); }
+    80% { transform: translateY(-5px); }
+}
+
+#flightLogsBtn {
+    position: relative;
+}
+
+/* Ticker Notification */
+.ticker-notification {
+    position: fixed;
+    top: 80px;
+    right: 20px;
+    background: linear-gradient(135deg, #00d4aa 0%, #01a085 100%);
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+    backdrop-filter: blur(10px);
+    z-index: 1500;
+    transform: translateX(400px);
+    transition: transform 0.4s ease-in-out;
+    max-width: 350px;
+    min-width: 280px;
+}
+
+.ticker-notification.show {
+    transform: translateX(0);
+}
+
+.ticker-content {
+    padding: 12px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    color: white;
+}
+
+.ticker-content i {
+    font-size: 16px;
+    color: #ffffff;
+    flex-shrink: 0;
+}
+
+.ticker-message {
+    flex: 1;
+    font-size: 14px;
+    font-weight: 500;
+    line-height: 1.3;
+}
+
+.ticker-close {
+    background: none;
+    border: none;
+    color: rgba(255, 255, 255, 0.8);
+    cursor: pointer;
+    padding: 4px;
+    border-radius: 4px;
+    transition: all 0.3s ease;
+    flex-shrink: 0;
+}
+
+.ticker-close:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: white;
 }
 
 /* Buttons */
@@ -1115,6 +1212,14 @@ body {
     .header-right .btn {
         padding: 8px 12px;
         font-size: 12px;
+    }
+    
+    .ticker-notification {
+        top: 120px;
+        right: 10px;
+        left: 10px;
+        max-width: none;
+        min-width: auto;
     }
     
     .status-grid {
