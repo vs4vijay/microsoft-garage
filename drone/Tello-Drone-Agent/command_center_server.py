@@ -2,6 +2,8 @@
 """
 Enhanced Drone Command Center Bridge
 Integrates the web interface directly with the existing autonomous_realtime_drone_agent.py
+Run: 
+uv run --with-requirements requirements.txt --with-requirements requirements.cc.txt command_center_server.py
 """
 
 import asyncio
@@ -18,12 +20,12 @@ from datetime import datetime
 sys.path.insert(0, os.path.dirname(os.path.dirname(__file__)))
 
 from autonomous_realtime_drone_agent import RealtimeDroneAgent, DroneState
-from command_center_server import DroneCommandCenterServer
+from command_center import CommandCenter
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
-class EnhancedDroneCommandCenter(DroneCommandCenterServer):
+class CommandCenterServer(CommandCenter):
     """Enhanced command center that integrates with the autonomous drone agent."""
     
     def __init__(self, vision_only: bool = True, port: int = 8000):
@@ -338,7 +340,7 @@ async def main():
         return
     
     # Create and run enhanced server
-    server = EnhancedDroneCommandCenter(vision_only=vision_only, port=args.port)
+    server = CommandCenterServer(vision_only=vision_only, port=args.port)
     
     try:
         await server.run()

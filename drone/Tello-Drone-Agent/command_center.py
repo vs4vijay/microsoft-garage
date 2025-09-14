@@ -77,7 +77,7 @@ class ClientSession:
     settings: Dict[str, Any]
     connected_at: datetime
 
-class DroneCommandCenterServer:
+class CommandCenter:
     """Web server for Drone Command Center interface."""
     
     def __init__(self, vision_only: bool = True, port: int = 8000):
@@ -733,7 +733,7 @@ async def main():
     print()
     
     # Create and run server
-    server = DroneCommandCenterServer(vision_only=vision_only, port=args.port)
+    server = CommandCenter(vision_only=vision_only, port=args.port)
     
     try:
         await server.run()
