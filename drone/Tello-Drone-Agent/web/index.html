@@ -64,143 +64,6 @@
                     </div>
                 </div>
 
-                <!-- Manual Controls -->
-                <div class="controls-section">
-                    <h3>Manual Controls</h3>
-                    <div class="control-grid">
-                        <!-- Movement Controls -->
-                        <div class="movement-controls">
-                            <div class="control-row">
-                                <button class="control-btn" data-command="takeoff">
-                                    <i class="fas fa-plane-departure"></i>
-                                    Takeoff
-                                </button>
-                                <button class="control-btn" data-command="move_up">
-                                    <i class="fas fa-arrow-up"></i>
-                                    Up
-                                </button>
-                                <button class="control-btn" data-command="land">
-                                    <i class="fas fa-plane-arrival"></i>
-                                    Land
-                                </button>
-                            </div>
-                            <div class="control-row">
-                                <button class="control-btn" data-command="move_left">
-                                    <i class="fas fa-arrow-left"></i>
-                                    Left
-                                </button>
-                                <button class="control-btn" data-command="move_down">
-                                    <i class="fas fa-arrow-down"></i>
-                                    Down
-                                </button>
-                                <button class="control-btn" data-command="move_right">
-                                    <i class="fas fa-arrow-right"></i>
-                                    Right
-                                </button>
-                            </div>
-                            <div class="control-row">
-                                <button class="control-btn" data-command="move_back">
-                                    <i class="fas fa-arrow-down"></i>
-                                    Back
-                                </button>
-                                <button class="control-btn" data-command="move_forward">
-                                    <i class="fas fa-arrow-up"></i>
-                                    Forward
-                                </button>
-                                <button class="control-btn" data-command="hover">
-                                    <i class="fas fa-pause"></i>
-                                    Hover
-                                </button>
-                            </div>
-                        </div>
-
-                        <!-- Rotation Controls -->
-                        <div class="rotation-controls">
-                            <button class="control-btn" data-command="rotate_left">
-                                <i class="fas fa-undo"></i>
-                                Rotate Left
-                            </button>
-                            <button class="control-btn" data-command="rotate_right">
-                                <i class="fas fa-redo"></i>
-                                Rotate Right
-                            </button>
-                        </div>
-
-                        <!-- Distance Slider -->
-                        <div class="distance-control">
-                            <label for="distanceSlider">Distance: <span id="distanceValue">30</span>cm</label>
-                            <input type="range" id="distanceSlider" min="20" max="100" value="30">
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Mission Planner -->
-                <div class="mission-section">
-                    <h3>Mission Planner</h3>
-                    <div class="mission-controls">
-                        <select id="missionType">
-                            <option value="patrol">Patrol Pattern</option>
-                            <option value="circle">Circle Pattern</option>
-                            <option value="square">Square Pattern</option>
-                            <option value="waypoints">Custom Waypoints</option>
-                        </select>
-                        <button class="btn" id="startMission">
-                            <i class="fas fa-play"></i>
-                            Start Mission
-                        </button>
-                        <button class="btn" id="pauseMission">
-                            <i class="fas fa-pause"></i>
-                            Pause
-                        </button>
-                    </div>
-                </div>
-            </div>
-
-            <!-- Right Panel: Chat & Status -->
-            <div class="right-panel">
-                <!-- Chat Interface -->
-                <div class="chat-section">
-                    <div class="chat-header">
-                        <h3>Drone Assistant</h3>
-                        <div class="chat-controls">
-                            <button class="btn btn-sm" id="voiceToggle">
-                                <i class="fas fa-microphone"></i>
-                            </button>
-                            <button class="btn btn-sm" id="clearChat">
-                                <i class="fas fa-trash"></i>
-                            </button>
-                        </div>
-                    </div>
-                    <div class="chat-messages" id="chatMessages">
-                        <div class="message system">
-                            <div class="message-content">
-                                <i class="fas fa-robot"></i>
-                                Welcome to Drone Command Center! I'm your AI assistant. You can type or speak your commands.
-                            </div>
-                            <div class="message-time">Just now</div>
-                        </div>
-                    </div>
-                    <div class="chat-input">
-                        <div class="input-container">
-                            <input type="text" id="messageInput" placeholder="Type your command or question...">
-                            <button id="sendMessage">
-                                <i class="fas fa-paper-plane"></i>
-                            </button>
-                            <button id="voiceInput" class="voice-btn">
-                                <i class="fas fa-microphone"></i>
-                            </button>
-                        </div>
-                        <div class="voice-indicator" id="voiceIndicator">
-                            <div class="voice-animation">
-                                <span></span>
-                                <span></span>
-                                <span></span>
-                            </div>
-                            <span>Listening...</span>
-                        </div>
-                    </div>
-                </div>
-
                 <!-- Status Dashboard -->
                 <div class="status-section">
                     <h3>Drone Status</h3>
@@ -271,6 +134,149 @@
                             <span class="log-message">System initialized</span>
                         </div>
                     </div>
+                </div>
+            </div>
+
+            <!-- Right Panel: Chat & Status -->
+            <div class="right-panel">
+                <!-- Chat Interface -->
+                <div class="chat-section">
+                    <div class="chat-header">
+                        <h3>Drone Assistant</h3>
+                        <div class="chat-controls">
+                            <button class="btn btn-sm" id="voiceToggle">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                            <button class="btn btn-sm" id="clearChat">
+                                <i class="fas fa-trash"></i>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="chat-messages" id="chatMessages">
+                        <div class="message system">
+                            <div class="message-content">
+                                <i class="fas fa-robot"></i>
+                                Welcome to Drone Command Center! I'm your AI assistant. You can type or speak your commands.
+                            </div>
+                            <div class="message-time">Just now</div>
+                        </div>
+                    </div>
+                    <div class="chat-input">
+                        <div class="input-container">
+                            <input type="text" id="messageInput" placeholder="Type your command or question...">
+                            <button id="sendMessage">
+                                <i class="fas fa-paper-plane"></i>
+                            </button>
+                            <button id="voiceInput" class="voice-btn">
+                                <i class="fas fa-microphone"></i>
+                            </button>
+                        </div>
+                        <div class="voice-indicator" id="voiceIndicator">
+                            <div class="voice-animation">
+                                <span></span>
+                                <span></span>
+                                <span></span>
+                            </div>
+                            <span>Listening...</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Manual Controls -->
+                <div class="controls-section">
+                    <div class="controls-header">
+                        <h3>Manual Controls</h3>
+                        <button class="collapse-btn" id="controlsToggle">
+                            <i class="fas fa-chevron-up"></i>
+                        </button>
+                    </div>
+                    <div class="control-grid" id="controlsContent">
+                        <!-- Movement Controls -->
+                        <div class="movement-controls">
+                            <div class="control-row">
+                                <button class="control-btn" data-command="takeoff">
+                                    <i class="fas fa-plane-departure"></i>
+                                    Takeoff
+                                </button>
+                                <button class="control-btn" data-command="move_up">
+                                    <i class="fas fa-arrow-up"></i>
+                                    Up
+                                </button>
+                                <button class="control-btn" data-command="land">
+                                    <i class="fas fa-plane-arrival"></i>
+                                    Land
+                                </button>
+                            </div>
+                            <div class="control-row">
+                                <button class="control-btn" data-command="move_left">
+                                    <i class="fas fa-arrow-left"></i>
+                                    Left
+                                </button>
+                                <button class="control-btn" data-command="move_down">
+                                    <i class="fas fa-arrow-down"></i>
+                                    Down
+                                </button>
+                                <button class="control-btn" data-command="move_right">
+                                    <i class="fas fa-arrow-right"></i>
+                                    Right
+                                </button>
+                            </div>
+                            <div class="control-row">
+                                <button class="control-btn" data-command="move_back">
+                                    <i class="fas fa-arrow-down"></i>
+                                    Back
+                                </button>
+                                <button class="control-btn" data-command="move_forward">
+                                    <i class="fas fa-arrow-up"></i>
+                                    Forward
+                                </button>
+                                <button class="control-btn" data-command="hover">
+                                    <i class="fas fa-pause"></i>
+                                    Hover
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Rotation Controls -->
+                        <div class="rotation-controls">
+                            <button class="control-btn" data-command="rotate_left">
+                                <i class="fas fa-undo"></i>
+                                Rotate Left
+                            </button>
+                            <button class="control-btn" data-command="rotate_right">
+                                <i class="fas fa-redo"></i>
+                                Rotate Right
+                            </button>
+                        </div>
+
+                        <!-- Distance Slider -->
+                        <div class="distance-control">
+                            <label for="distanceSlider">Distance: <span id="distanceValue">30</span>cm</label>
+                            <input type="range" id="distanceSlider" min="20" max="100" value="30">
+                        </div>
+
+                        <!-- Mission Planner -->
+                        <div class="mission-controls">
+                            <h4>Mission Planner</h4>
+                            <div class="mission-buttons">
+                                <select id="missionType">
+                                    <option value="patrol">Patrol Pattern</option>
+                                    <option value="circle">Circle Pattern</option>
+                                    <option value="square">Square Pattern</option>
+                                    <option value="waypoints">Custom Waypoints</option>
+                                </select>
+                                <button class="btn" id="startMission">
+                                    <i class="fas fa-play"></i>
+                                    Start Mission
+                                </button>
+                                <button class="btn" id="pauseMission">
+                                    <i class="fas fa-pause"></i>
+                                    Pause
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
                 </div>
             </div>
         </div>

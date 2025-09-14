@@ -183,7 +183,7 @@ body {
 
 .video-container {
     position: relative;
-    height: 300px;
+    height: 600px;
     background: #000;
     display: flex;
     align-items: center;
@@ -260,16 +260,56 @@ body {
     padding: 20px;
 }
 
+.controls-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 20px;
+}
+
 .controls-section h3 {
     font-size: 18px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin: 0;
+}
+
+.collapse-btn {
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    border-radius: 8px;
+    color: #ffffff;
+    padding: 8px 12px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    font-size: 14px;
+}
+
+.collapse-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+    color: #00d4aa;
+}
+
+.collapse-btn i {
+    transition: transform 0.3s ease;
+}
+
+.collapse-btn.collapsed i {
+    transform: rotate(180deg);
 }
 
 .control-grid {
     display: flex;
     flex-direction: column;
     gap: 20px;
+    transition: all 0.3s ease;
+    overflow: hidden;
+}
+
+.control-grid.collapsed {
+    max-height: 0;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
 }
 
 .movement-controls {
@@ -351,39 +391,45 @@ body {
     cursor: pointer;
 }
 
-/* Mission Section */
-.mission-section {
-    background: rgba(26, 26, 46, 0.6);
-    border-radius: 16px;
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px;
-}
-
-.mission-section h3 {
-    font-size: 18px;
-    font-weight: 600;
-    margin-bottom: 15px;
-}
-
+/* Mission Controls within Manual Controls */
 .mission-controls {
+    margin-top: 15px;
+    padding-top: 15px;
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.mission-controls h4 {
+    font-size: 14px;
+    font-weight: 600;
+    margin-bottom: 10px;
+    color: #00d4aa;
+}
+
+.mission-buttons {
     display: flex;
-    gap: 10px;
+    gap: 8px;
     align-items: center;
     flex-wrap: wrap;
 }
 
-.mission-controls select {
-    padding: 8px 12px;
+.mission-buttons select {
+    padding: 6px 10px;
     background: rgba(255, 255, 255, 0.1);
     border: 1px solid rgba(255, 255, 255, 0.2);
-    border-radius: 8px;
+    border-radius: 6px;
     color: #ffffff;
-    font-size: 14px;
+    font-size: 12px;
+    min-width: 120px;
 }
 
-.mission-controls select option {
+.mission-buttons select option {
     background: #1a1a2e;
     color: #ffffff;
+}
+
+.mission-buttons .btn {
+    padding: 6px 12px;
+    font-size: 12px;
 }
 
 /* Right Panel */
@@ -406,6 +452,13 @@ body {
     display: flex;
     flex-direction: column;
     height: 400px;
+    transition: height 0.3s ease;
+}
+
+/* Enhanced chat section when controls are collapsed */
+.right-panel .chat-section {
+    flex-grow: 1;
+    min-height: 400px;
 }
 
 .chat-header {
@@ -575,43 +628,49 @@ body {
 /* Status Section */
 .status-section {
     background: rgba(26, 26, 46, 0.6);
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px;
+    padding: 10px 15px;
 }
 
 .status-section h3 {
-    font-size: 18px;
+    font-size: 14px;
     font-weight: 600;
-    margin-bottom: 20px;
+    margin-bottom: 10px;
 }
 
 .status-grid {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 15px;
+    display: flex;
+    gap: 8px;
+    justify-content: space-between;
+    flex-wrap: nowrap;
+    overflow-x: auto;
 }
 
 .status-item {
     display: flex;
     align-items: center;
-    gap: 12px;
-    padding: 12px;
+    gap: 6px;
+    padding: 6px 10px;
     background: rgba(255, 255, 255, 0.05);
-    border-radius: 12px;
+    border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.1);
+    flex: 1;
+    min-width: 90px;
+    max-width: 120px;
 }
 
 .status-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 10px;
+    width: 24px;
+    height: 24px;
+    border-radius: 6px;
     background: rgba(0, 212, 170, 0.2);
     display: flex;
     align-items: center;
     justify-content: center;
     color: #00d4aa;
-    font-size: 18px;
+    font-size: 12px;
+    flex-shrink: 0;
 }
 
 .status-info {
@@ -621,15 +680,17 @@ body {
 }
 
 .status-label {
-    font-size: 12px;
+    font-size: 9px;
     color: rgba(255, 255, 255, 0.7);
     font-weight: 500;
+    line-height: 1;
 }
 
 .status-value {
-    font-size: 16px;
+    font-size: 12px;
     font-weight: 600;
     color: #ffffff;
+    line-height: 1;
 }
 
 /* Log Section */
@@ -637,16 +698,16 @@ body {
     background: rgba(26, 26, 46, 0.6);
     border-radius: 16px;
     border: 1px solid rgba(255, 255, 255, 0.1);
-    padding: 20px;
+    padding: 15px;
     height: 200px;
     display: flex;
     flex-direction: column;
 }
 
 .log-section h3 {
-    font-size: 18px;
+    font-size: 16px;
     font-weight: 600;
-    margin-bottom: 15px;
+    margin-bottom: 10px;
 }
 
 .log-messages {
@@ -844,7 +905,12 @@ body {
     }
     
     .status-grid {
-        grid-template-columns: repeat(3, 1fr);
+        flex-wrap: wrap;
+    }
+    
+    .status-item {
+        min-width: 80px;
+        flex: 0 1 auto;
     }
 }
 
@@ -860,7 +926,27 @@ body {
     }
     
     .status-grid {
-        grid-template-columns: repeat(2, 1fr);
+        flex-wrap: wrap;
+        gap: 6px;
+    }
+    
+    .status-item {
+        min-width: 70px;
+        padding: 4px 8px;
+    }
+    
+    .status-icon {
+        width: 20px;
+        height: 20px;
+        font-size: 10px;
+    }
+    
+    .status-label {
+        font-size: 8px;
+    }
+    
+    .status-value {
+        font-size: 10px;
     }
     
     .control-row {

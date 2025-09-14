@@ -11,6 +11,7 @@ class DroneCommandCenter {
         
         this.initializeElements();
         this.setupEventListeners();
+        this.initializeControlsState();
         this.initializeSpeechRecognition();
         this.startVideoStream();
         this.connectToServer();
@@ -54,6 +55,19 @@ class DroneCommandCenter {
         this.settingsModal = document.getElementById('settingsModal');
     }
 
+    initializeControlsState() {
+        // Restore collapsed state from localStorage
+        const isCollapsed = localStorage.getItem('controlsCollapsed') === 'true';
+        if (isCollapsed) {
+            const controlsContent = document.getElementById('controlsContent');
+            const toggleBtn = document.getElementById('controlsToggle');
+            controlsContent.classList.add('collapsed');
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+            this.adjustChatLayout();
+        }
+    }
+
     setupEventListeners() {
         // Header buttons
         document.getElementById('emergencyStop').addEventListener('click', () => this.emergencyStop());
@@ -76,6 +90,9 @@ class DroneCommandCenter {
         this.distanceSlider.addEventListener('input', (e) => {
             this.distanceValue.textContent = e.target.value;
         });
+
+        // Controls collapse toggle
+        document.getElementById('controlsToggle').addEventListener('click', () => this.toggleControls());
 
         // Mission controls
         document.getElementById('startMission').addEventListener('click', () => this.startMission());
@@ -410,6 +427,43 @@ class DroneCommandCenter {
         
         this.sendToServer(commandData);
         this.addLogEntry(`Manual command: ${command}${distance ? ` (${distance}cm)` : ''}`);
+    }
+
+    toggleControls() {
+        const controlsContent = document.getElementById('controlsContent');
+        const toggleBtn = document.getElementById('controlsToggle');
+        const isCollapsed = controlsContent.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            // Expand controls
+            controlsContent.classList.remove('collapsed');
+            toggleBtn.classList.remove('collapsed');
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-up"></i>';
+            localStorage.setItem('controlsCollapsed', 'false');
+        } else {
+            // Collapse controls
+            controlsContent.classList.add('collapsed');
+            toggleBtn.classList.add('collapsed');
+            toggleBtn.innerHTML = '<i class="fas fa-chevron-down"></i>';
+            localStorage.setItem('controlsCollapsed', 'true');
+        }
+        
+        // Trigger layout adjustment for better chat experience
+        this.adjustChatLayout();
+    }
+
+    adjustChatLayout() {
+        const controlsContent = document.getElementById('controlsContent');
+        const chatSection = document.querySelector('.chat-section');
+        const isCollapsed = controlsContent.classList.contains('collapsed');
+        
+        if (isCollapsed) {
+            // Give more space to chat when controls are collapsed
+            chatSection.style.flex = '1';
+        } else {
+            // Reset chat layout when controls are expanded
+            chatSection.style.flex = '';
+        }
     }
 
     emergencyStop() {
