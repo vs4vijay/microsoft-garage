@@ -1,7 +1,6 @@
-#!/usr/bin/env python3
 """
-Autonomous Realtime Drone Agent using GPT-4o Realtime API
-Provides speech input, image input, speech output, and drone control.
+Web-enabled Autonomous Realtime Drone Agent using GPT-4o Realtime API
+Provides speech input, image input, speech output, drone control, and web UI via WebSocket.
 """
 
 import asyncio
@@ -21,6 +20,9 @@ import pyaudio
 import cv2
 import numpy as np
 from dotenv import load_dotenv
+import socketio
+from aiohttp import web
+import aiohttp_cors
 
 # Load environment variables from .env file
 load_dotenv()
@@ -33,7 +35,6 @@ from vision_analyzer import VisionAnalyzer
 from drone_controller import DroneController
 
 # Use our own settings class that reads from environment variables
-# (bypassing the original settings.py to avoid pydantic validation errors)
 class EnvironmentSettings:
     def __init__(self):
         self.azure_openai_endpoint = os.getenv('AZURE_OPENAI_ENDPOINT', 'https://your-resource.openai.azure.com')
@@ -43,9 +44,9 @@ class EnvironmentSettings:
 settings = EnvironmentSettings()
 
 try:
-    from drone.simple_tello import SimpleTello
+    from src.drone.simple_tello import SimpleTello
 except ImportError:
-    # Mock SimpleTello for testing
+    # Mock SimpleTello for testing when real drone module isn't available
     class SimpleTello:
         def __init__(self):
             self.is_connected = False
@@ -85,15 +86,17 @@ class DroneState:
         if self.obstacles_detected is None:
             self.obstacles_detected = []
 
-class RealtimeDroneAgent:
-    """Real-time speech and vision drone controller using GPT-4o Realtime API."""
+class WebEnabledDroneAgent:
+    """Real-time speech and vision drone controller with web UI support."""
     
-    def __init__(self, vision_only: bool = False):
+    def __init__(self, vision_only: bool = False, enable_web_ui: bool = True):
         self.logger = logging.getLogger(__name__)
         self.vision_only = vision_only
+        self.enable_web_ui = enable_web_ui
         
         # Drone components
-        self.drone = SimpleTello()  # Always create drone instance (mock or real)
+        self.drone = SimpleTello()
+        
         self.drone_state = DroneState()
         
         # Audio configuration
@@ -107,9 +110,15 @@ class RealtimeDroneAgent:
         self.input_stream = None
         self.output_stream = None
         
-        # WebSocket connection
-        self.websocket = None
-        self.is_connected = False
+        # WebSocket connection for GPT-4o Realtime
+        self.realtime_websocket = None
+        self.is_realtime_connected = False
+        
+        # Web UI WebSocket server
+        self.sio = None
+        self.web_app = None
+        self.web_runner = None
+        self.web_clients = set()
         
         # Audio queues
         self.input_audio_queue = queue.Queue()
@@ -119,6 +128,7 @@ class RealtimeDroneAgent:
         self.recording = False
         self.playing = False
         self.running = False
+        self.speech_enabled = True  # Speech control enabled by default
         
         # Vision analyzer for image processing
         self.vision_analyzer = VisionAnalyzer()
@@ -132,7 +142,11 @@ class RealtimeDroneAgent:
         
         # Image streaming
         self.last_image_time = 0
-        self.image_stream_interval = 3.0  # Send image every 3 seconds
+        self.image_stream_interval = 1.0  # Send image every 1 second for web UI
+        
+        # Video streaming for web UI
+        self.video_streaming = False
+        self.video_streaming_enabled = False  # Video streaming off by default
         
     def _register_drone_functions(self):
         """Register drone control functions."""
@@ -155,6 +169,262 @@ class RealtimeDroneAgent:
             "capture_and_analyze_image": self._capture_and_analyze_image
         }
     
+    async def setup_web_server(self):
+        """Set up the web UI server with Socket.IO."""
+        if not self.enable_web_ui:
+            return
+            
+        self.sio = socketio.AsyncServer(
+            cors_allowed_origins="*",
+            logger=False,
+            engineio_logger=False
+        )
+        
+        self.web_app = web.Application()
+        self.sio.attach(self.web_app)
+        
+        # Enable CORS
+        cors = aiohttp_cors.setup(self.web_app, defaults={
+            "*": aiohttp_cors.ResourceOptions(
+                allow_credentials=True,
+                expose_headers="*",
+                allow_headers="*",
+                allow_methods="*"
+            )
+        })
+        
+        # Socket.IO event handlers
+        @self.sio.event
+        async def connect(sid, environ):
+            self.web_clients.add(sid)
+            self.logger.info(f"🌐 Web client connected: {sid}")
+            
+            # Send current drone status
+            await self.broadcast_drone_status()
+            
+            # Video streaming is now controlled by user toggle, not auto-started
+        
+        @self.sio.event
+        async def disconnect(sid):
+            self.web_clients.discard(sid)
+            self.logger.info(f"🌐 Web client disconnected: {sid}")
+            
+            # Stop video streaming if no clients
+            if not self.web_clients:
+                self.video_streaming = False
+        
+        @self.sio.event
+        async def drone_command(sid, data):
+            """Handle drone commands from web UI."""
+            try:
+                command = data.get('command')
+                params = data.get('params', {})
+                
+                self.logger.info(f"🌐 Web command: {command} with params: {params}")
+                
+                # Execute the command
+                if command in self.functions:
+                    result = await self.functions[command](**params)
+                    await self.sio.emit('log', {
+                        'message': f"✅ {command}: {result}",
+                        'level': 'success',
+                        'timestamp': time.strftime('%H:%M:%S')
+                    }, room=sid)
+                    
+                    # Send updated drone status
+                    await self.broadcast_drone_status()
+                    
+                    # Signal command completion
+                    await self.sio.emit('command_complete', {'command': command, 'result': result}, room=sid)
+                else:
+                    error_msg = f"Unknown command: {command}"
+                    await self.sio.emit('log', {
+                        'message': f"❌ {error_msg}",
+                        'level': 'error',
+                        'timestamp': time.strftime('%H:%M:%S')
+                    }, room=sid)
+                    
+            except Exception as e:
+                error_msg = f"Command {command} failed: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                await self.sio.emit('log', {
+                    'message': f"❌ {error_msg}",
+                    'level': 'error',
+                    'timestamp': time.strftime('%H:%M:%S')
+                }, room=sid)
+        
+        @self.sio.event
+        async def speech_toggle(sid, data):
+            """Handle speech enable/disable toggle from web UI."""
+            try:
+                enabled = data.get('enabled', True)
+                self.speech_enabled = enabled
+                
+                status = "enabled" if enabled else "disabled"
+                self.logger.info(f"🎙️ Speech control {status} by web client {sid}")
+                
+                await self.sio.emit('log', {
+                    'message': f"🎙️ Speech control {status}",
+                    'level': 'info',
+                    'timestamp': time.strftime('%H:%M:%S')
+                }, room=sid)
+                
+                # Handle recording state based on speech enabled/disabled
+                if not enabled and self.recording:
+                    # If disabling speech, stop current recording
+                    self.recording = False
+                    self.logger.info("🎙️ Stopped audio recording")
+                elif enabled and not self.recording and self.is_realtime_connected:
+                    # If enabling speech and not currently recording, restart recording
+                    self.recording = True
+                    self.logger.info("🎙️ Restarted audio recording")
+                    
+                    # Start a new audio input worker thread if needed
+                    if self.input_stream and not any(t.name.startswith('_audio_input_worker') for t in threading.enumerate()):
+                        threading.Thread(target=self._audio_input_worker, daemon=True, name='_audio_input_worker_restart').start()
+                        self.logger.info("🎙️ Restarted audio input worker")
+                
+            except Exception as e:
+                error_msg = f"Speech toggle failed: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                await self.sio.emit('log', {
+                    'message': f"❌ {error_msg}",
+                    'level': 'error',
+                    'timestamp': time.strftime('%H:%M:%S')
+                }, room=sid)
+        
+        @self.sio.event
+        async def video_toggle(sid, data):
+            """Handle video streaming enable/disable toggle from web UI."""
+            try:
+                enabled = data.get('enabled', False)
+                self.video_streaming_enabled = enabled
+                
+                status = "enabled" if enabled else "disabled"
+                self.logger.info(f"📹 Video streaming {status} by web client {sid}")
+                
+                await self.sio.emit('log', {
+                    'message': f"📹 Video streaming {status}",
+                    'level': 'info',
+                    'timestamp': time.strftime('%H:%M:%S')
+                }, room=sid)
+                
+                # Handle video streaming state
+                if enabled and not self.video_streaming and self.web_clients:
+                    # Start video streaming
+                    self.video_streaming = True
+                    asyncio.create_task(self._video_stream_worker())
+                    self.logger.info("📹 Started video streaming")
+                elif not enabled and self.video_streaming:
+                    # Stop video streaming
+                    self.video_streaming = False
+                    self.logger.info("📹 Stopped video streaming")
+                
+            except Exception as e:
+                error_msg = f"Video toggle failed: {str(e)}"
+                self.logger.error(f"❌ {error_msg}")
+                await self.sio.emit('log', {
+                    'message': f"❌ {error_msg}",
+                    'level': 'error',
+                    'timestamp': time.strftime('%H:%M:%S')
+                }, room=sid)
+        
+        # Start web server
+        self.web_runner = web.AppRunner(self.web_app)
+        await self.web_runner.setup()
+        
+        site = web.TCPSite(self.web_runner, 'localhost', 8080)
+        await site.start()
+        
+        self.logger.info("🌐 Web UI server started on http://localhost:8080")
+    
+    async def _video_stream_worker(self):
+        """Stream video frames to web clients at 30 FPS in separate thread."""
+        def video_streaming_thread():
+            """Thread function for video streaming to avoid blocking main event loop."""
+            while self.video_streaming and self.video_streaming_enabled and self.web_clients:
+                try:
+                    if not self.vision_only:
+                        # Get frame from drone camera
+                        frame = self.drone.get_frame()
+                        
+                        # Check if frame is valid
+                        if frame is None:
+                            time.sleep(0.033)  # Wait ~30ms before retry
+                            continue
+                        elif frame.size == 0:
+                            continue
+                        else:
+                            # Convert BGR to RGB for correct color display
+                            frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    else:
+                        # Create a mock frame for simulation
+                        frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                        cv2.putText(frame, "SIMULATION MODE", (50, 50), cv2.FONT_HERSHEY_SIMPLEX, 1, (0, 255, 0), 2)
+                        cv2.putText(frame, f"Battery: {self.drone_state.battery}%", (50, 100), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        cv2.putText(frame, f"Height: {self.drone_state.height}cm", (50, 130), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                        cv2.putText(frame, f"Flying: {self.drone_state.is_flying}", (50, 160), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (255, 255, 255), 2)
+                    
+                    if frame is not None and frame.size > 0:
+                        if len(frame.shape) == 3 and frame.shape[2] == 3:
+                            # Resize for better performance while maintaining quality
+                            frame = cv2.resize(frame, (640, 480))
+                            
+                            # Use good quality for clear video
+                            encode_param = [cv2.IMWRITE_JPEG_QUALITY, 80]
+                            _, buffer = cv2.imencode('.jpg', frame, encode_param)
+                            frame_bytes = buffer.tobytes()
+                            
+                            # Send to all connected web clients using thread-safe call
+                            if self.web_clients and self.sio:
+                                asyncio.run_coroutine_threadsafe(
+                                    self.sio.emit('video_frame', frame_bytes),
+                                    self.loop
+                                )
+                    
+                    # 30 FPS = 33.33ms delay
+                    time.sleep(1/30)
+                    
+                except Exception as e:
+                    self.logger.error(f"❌ Video streaming error: {e}")
+                    time.sleep(0.1)
+        
+        # Store reference to event loop for thread-safe calls
+        self.loop = asyncio.get_event_loop()
+        
+        # Start video streaming in a separate thread to avoid blocking
+        import threading
+        self.video_thread = threading.Thread(target=video_streaming_thread, daemon=True)
+        self.video_thread.start()
+    
+    async def broadcast_log(self, message: str, level: str = 'info'):
+        """Broadcast log message to all web clients."""
+        if self.sio and self.web_clients:
+            await self.sio.emit('log', {
+                'message': message,
+                'level': level,
+                'timestamp': time.strftime('%H:%M:%S')
+            })
+    
+    async def broadcast_drone_status(self):
+        """Broadcast drone status to all web clients."""
+        if self.sio and self.web_clients:
+            # Convert snake_case to camelCase for WebUI compatibility
+            status_data = {
+                'isFlying': self.drone_state.is_flying,
+                'battery': self.drone_state.battery,
+                'height': self.drone_state.height,
+                'lastImageAnalysis': self.drone_state.last_image_analysis,
+                'movementCount': self.drone_state.movement_count,
+                'obstaclesDetected': self.drone_state.obstacles_detected,
+                'speechEnabled': self.speech_enabled,
+                'videoStreamingEnabled': self.video_streaming_enabled
+            }
+            await self.sio.emit('drone_status', status_data)
+    
+    # [Include all the existing methods from the original RealtimeDroneAgent class]
+    # For brevity, I'm including the key methods that need modification:
+    
     async def connect_realtime(self):
         """Connect to Azure OpenAI Realtime API."""
         try:
@@ -171,27 +441,156 @@ class RealtimeDroneAgent:
             
             self.logger.info(f"🔌 Connecting to realtime API...")
             
-            self.websocket = await websockets.connect(
+            self.realtime_websocket = await websockets.connect(
                 ws_url,
                 additional_headers=headers,
                 ping_interval=20,
                 ping_timeout=10
             )
             
-            self.is_connected = True
+            self.is_realtime_connected = True
             self.logger.info("✅ Connected to GPT-4o Realtime API")
+            await self.broadcast_log("Connected to GPT-4o Realtime API", "success")
             
             # Configure session with drone tools
             await self._configure_realtime_session()
             
             # Set up vision analyzer with websocket
-            self.vision_analyzer.set_websocket(self.websocket)
+            self.vision_analyzer.set_websocket(self.realtime_websocket)
             
             return True
             
         except Exception as e:
             self.logger.error(f"❌ Connection failed: {e}")
+            await self.broadcast_log(f"Realtime API connection failed: {e}", "error")
             return False
+    
+    async def _capture_and_analyze_image(self, focus: str = "objects", **kwargs) -> str:
+        """Capture and analyze image from drone camera using the vision analyzer."""
+        self.logger.info(f"📸 Delegating to vision analyzer: {focus}")
+        await self.broadcast_log(f"📸 Analyzing image: {focus}", "info")
+        
+        try:
+            result = await self.vision_analyzer.capture_and_analyze_image(
+                drone=self.drone, 
+                focus=focus, 
+                vision_only=self.vision_only
+            )
+            
+            # Update drone state with analysis result
+            self.drone_state.last_image_analysis = result
+            await self.broadcast_drone_status()
+            
+            return result
+            
+        except Exception as e:
+            error_msg = f"Vision analysis error: {str(e)}"
+            self.logger.error(f"❌ {error_msg}")
+            await self.broadcast_log(error_msg, "error")
+            return error_msg
+    
+    # ... (include all other methods from the original class with web UI broadcasting support)
+    
+    async def start_hybrid_control(self):
+        """Start both speech control and web UI control."""
+        self.running = True
+        
+        try:
+            # Initialize drone if not vision-only
+            if not self.vision_only:
+                self._setup_drone()
+            
+            # Setup web server if enabled
+            if self.enable_web_ui:
+                await self.setup_web_server()
+            
+            # Start audio streams for speech control
+            self.start_audio_streams()
+            
+            self.logger.info("🚁🎙️🌐 Hybrid drone control started!")
+            self.logger.info("💡 Control methods available:")
+            self.logger.info("   • Speech commands via microphone")
+            self.logger.info("   • Web UI at http://localhost:8080")
+            self.logger.info("💡 Press Ctrl+C to stop")
+            
+            await self.broadcast_log("Hybrid drone control system started", "success")
+            
+            # Start main communication loops
+            tasks = []
+            
+            # Speech control tasks
+            if self.is_realtime_connected:
+                tasks.extend([
+                    self._send_audio_to_api(),
+                    self._handle_realtime_messages()
+                ])
+            
+            # Status update task
+            tasks.append(self._status_update_worker())
+            
+            await asyncio.gather(*tasks)
+            
+        except KeyboardInterrupt:
+            self.logger.info("👋 Hybrid control stopped by user")
+        except Exception as e:
+            self.logger.error(f"❌ Hybrid control error: {e}")
+            await self.broadcast_log(f"System error: {e}", "error")
+        finally:
+            await self.cleanup()
+    
+    async def _status_update_worker(self):
+        """Periodically update and broadcast drone status."""
+        while self.running:
+            try:
+                # Update drone status
+                if not self.vision_only:
+                    self.drone_state.battery = self.drone.get_battery()
+                    self.drone_state.height = self.drone.get_height()
+                
+                # Broadcast to web clients
+                await self.broadcast_drone_status()
+                
+                await asyncio.sleep(2)  # Update every 2 seconds
+                
+            except Exception as e:
+                self.logger.error(f"❌ Status update error: {e}")
+                await asyncio.sleep(5)
+    
+    def _setup_drone(self):
+        """Initialize drone connection.""" 
+        try:
+            self.logger.info("Connecting to Tello drone...")
+            if self.drone.connect():
+                self.logger.info("✅ Drone connected, starting video stream...")
+                
+                # Start video stream
+                self.drone.streamon()
+                
+                # Wait a moment for video stream to initialize
+                time.sleep(2)
+                
+                # Get drone status
+                self.drone_state.battery = self.drone.get_battery()
+                self.drone_state.height = self.drone.get_height()
+                
+                self.logger.info(f"✅ Drone fully initialized - Battery: {self.drone_state.battery}%, Height: {self.drone_state.height}cm")
+                asyncio.create_task(self.broadcast_log(f"Drone connected - Battery: {self.drone_state.battery}%, Height: {self.drone_state.height}cm", "success"))
+                
+                # Test video stream
+                test_frame = self.drone.get_frame()
+                if test_frame is not None and test_frame.size > 0:
+                    self.logger.info("✅ Video stream confirmed working")
+                    asyncio.create_task(self.broadcast_log("Video stream initialized", "success"))
+                else:
+                    self.logger.warning("⚠️ Video stream may not be working properly")
+                    asyncio.create_task(self.broadcast_log("Video stream initialization uncertain", "warning"))
+                    
+            else:
+                self.logger.error("❌ Failed to connect to drone")
+                asyncio.create_task(self.broadcast_log("Failed to connect to drone", "error"))
+        except Exception as e:
+            self.logger.error(f"❌ Drone setup error: {e}")
+            asyncio.create_task(self.broadcast_log(f"Drone setup error: {e}", "error"))
     
     async def _configure_realtime_session(self):
         """Configure the realtime session with drone tools."""
@@ -492,29 +891,8 @@ class RealtimeDroneAgent:
             }
         }
         
-        await self.websocket.send(json.dumps(session_config))
+        await self.realtime_websocket.send(json.dumps(session_config))
         self.logger.info("🔧 Realtime session configured with drone tools")
-    
-    async def _capture_and_analyze_image(self, focus: str = "objects", **kwargs) -> str:
-        """Capture and analyze image from drone camera using the vision analyzer."""
-        self.logger.info(f"📸 Delegating to vision analyzer: {focus}")
-        
-        try:
-            result = await self.vision_analyzer.capture_and_analyze_image(
-                drone=self.drone, 
-                focus=focus, 
-                vision_only=self.vision_only
-            )
-            
-            # Update drone state with analysis result
-            self.drone_state.last_image_analysis = result
-            
-            return result
-            
-        except Exception as e:
-            error_msg = f"Vision analysis error: {str(e)}"
-            self.logger.error(f"❌ {error_msg}")
-            return error_msg
     
     def start_audio_streams(self):
         """Start audio input and output streams."""
@@ -576,26 +954,34 @@ class RealtimeDroneAgent:
     
     async def _send_audio_to_api(self):
         """Send microphone audio to the realtime API."""
-        while self.is_connected and self.running:
+        while self.is_realtime_connected and self.running:
             try:
-                if not self.input_audio_queue.empty():
-                    audio_chunk = self.input_audio_queue.get_nowait()
+                # Only process audio if speech is enabled
+                if self.speech_enabled and not self.input_audio_queue.empty():
+                    audio_data = self.input_audio_queue.get(timeout=0.1)
                     
-                    # Convert to base64
-                    audio_base64 = base64.b64encode(audio_chunk).decode()
+                    # Encode audio data as base64
+                    audio_base64 = base64.b64encode(audio_data).decode('utf-8')
                     
-                    # Send to API
+                    # Send audio to realtime API
                     message = {
                         "type": "input_audio_buffer.append",
                         "audio": audio_base64
                     }
                     
-                    await self.websocket.send(json.dumps(message))
+                    await self.realtime_websocket.send(json.dumps(message))
+                elif not self.speech_enabled:
+                    # Clear the audio queue when speech is disabled to prevent buffer buildup
+                    while not self.input_audio_queue.empty():
+                        try:
+                            self.input_audio_queue.get_nowait()
+                        except queue.Empty:
+                            break
                 
-                await asyncio.sleep(0.01)  # Small delay
+                await asyncio.sleep(0.01)  # Small delay to prevent overwhelming
                 
             except queue.Empty:
-                await asyncio.sleep(0.01)
+                continue
             except Exception as e:
                 self.logger.error(f"❌ Audio send error: {e}")
                 await asyncio.sleep(0.1)
@@ -603,16 +989,16 @@ class RealtimeDroneAgent:
     async def _handle_realtime_messages(self):
         """Handle messages from the realtime API."""
         try:
-            async for message in self.websocket:
+            async for message in self.realtime_websocket:
                 data = json.loads(message)
                 await self._process_message(data)
                 
         except websockets.exceptions.ConnectionClosed:
             self.logger.info("🔌 WebSocket connection closed")
-            self.is_connected = False
+            self.is_realtime_connected = False
         except Exception as e:
             self.logger.error(f"❌ Message handling error: {e}")
-            self.is_connected = False
+            self.is_realtime_connected = False
     
     async def _process_message(self, data):
         """Process individual message from the API."""
@@ -630,6 +1016,7 @@ class RealtimeDroneAgent:
         elif msg_type == "conversation.item.input_audio_transcription.completed":
             transcript = data.get("transcript", "")
             self.logger.info(f"📝 You said: {transcript}")
+            await self.broadcast_log(f"🗣️ You said: {transcript}", "info")
             
         elif msg_type == "response.audio.delta":
             # Stream audio response to speakers
@@ -663,7 +1050,7 @@ class RealtimeDroneAgent:
                     }
                 }
                 
-                await self.websocket.send(json.dumps(response))
+                await self.realtime_websocket.send(json.dumps(response))
                 
                 # Check if this is a vision analysis that's already handling its own response
                 if result.startswith("[PROCESSING]"):
@@ -679,13 +1066,15 @@ class RealtimeDroneAgent:
                     response_request = {
                         "type": "response.create"
                     }
-                    await self.websocket.send(json.dumps(response_request))
+                    await self.realtime_websocket.send(json.dumps(response_request))
                 
             except Exception as e:
                 self.logger.error(f"❌ Function execution error: {e}")
+                await self.broadcast_log(f"❌ Function execution error: {e}", "error")
                 
         elif msg_type == "error":
             self.logger.error(f"❌ API Error: {data}")
+            await self.broadcast_log(f"❌ API Error: {data}", "error")
     
     async def _execute_function(self, function_name: str, arguments: dict) -> str:
         """Execute a drone function and return result."""
@@ -694,64 +1083,18 @@ class RealtimeDroneAgent:
                 func = self.functions[function_name]
                 result = await func(**arguments)
                 self.logger.info(f"✅ {function_name}: {result}")
+                await self.broadcast_log(f"✅ {function_name}: {result}", "success")
                 return result
             else:
                 error_msg = f"Unknown function: {function_name}"
                 self.logger.error(f"❌ {error_msg}")
+                await self.broadcast_log(f"❌ {error_msg}", "error")
                 return error_msg
-                
         except Exception as e:
-            error_msg = f"Function {function_name} error: {str(e)}"
+            error_msg = f"Function {function_name} failed: {str(e)}"
             self.logger.error(f"❌ {error_msg}")
+            await self.broadcast_log(f"❌ {error_msg}", "error")
             return error_msg
-    
-    async def start_realtime_control(self):
-        """Start the real-time drone control session."""
-        self.running = True
-        
-        try:
-            # Initialize drone if not vision-only
-            if not self.vision_only:
-                self._setup_drone()
-            
-            # Start audio streams
-            self.start_audio_streams()
-            
-            self.logger.info("🚁🎙️ Real-time drone control started!")
-            self.logger.info("💡 Speak your commands! Examples:")
-            self.logger.info("   • 'Take off'")
-            self.logger.info("   • 'Move forward 50 centimeters'") 
-            self.logger.info("   • 'Rotate 90 degrees clockwise'")
-            self.logger.info("   • 'What do you see?' (for camera analysis)")
-            self.logger.info("   • 'Land'")
-            self.logger.info("   • 'Emergency stop'")
-            self.logger.info("💡 Press Ctrl+C to stop")
-            
-            # Start main communication loops
-            await asyncio.gather(
-                self._send_audio_to_api(),
-                self._handle_realtime_messages()
-            )
-            
-        except KeyboardInterrupt:
-            self.logger.info("👋 Real-time control stopped by user")
-        except Exception as e:
-            self.logger.error(f"❌ Real-time control error: {e}")
-        finally:
-            await self.cleanup()
-    
-    def _setup_drone(self):
-        """Initialize drone connection.""" 
-        try:
-            self.logger.info("Connecting to Tello drone...")
-            if self.drone.connect():
-                self.drone.streamon()
-                self.drone_state.battery = self.drone.get_battery()
-                self.logger.info(f"✅ Drone connected, battery: {self.drone_state.battery}%")
-            else:
-                self.logger.error("❌ Failed to connect to drone")
-        except Exception as e:
-            self.logger.error(f"❌ Drone setup error: {e}")
     
     async def cleanup(self):
         """Clean up all resources."""
@@ -760,7 +1103,8 @@ class RealtimeDroneAgent:
         self.running = False
         self.recording = False
         self.playing = False
-        self.is_connected = False
+        self.is_realtime_connected = False
+        self.video_streaming = False
         
         # Clean up audio
         if self.input_stream:
@@ -796,74 +1140,101 @@ class RealtimeDroneAgent:
                 self.logger.warning(f"Drone cleanup warning: {e}")
         
         # Close WebSocket
-        if self.websocket:
+        if self.realtime_websocket:
             try:
-                await self.websocket.close()
+                await self.realtime_websocket.close()
+            except:
+                pass
+        
+        # Clean up web server
+        if self.web_runner:
+            try:
+                await self.web_runner.cleanup()
             except:
                 pass
         
         self.logger.info("✅ Cleanup completed")
 
 async def main():
-    """Main function to run the realtime drone agent."""
+    """Main function to run the web-enabled drone agent."""
     
     # Parse command line arguments
-    parser = argparse.ArgumentParser(description='Autonomous Realtime Drone Agent')
+    parser = argparse.ArgumentParser(description='Web-enabled Autonomous Realtime Drone Agent')
     parser.add_argument('--vision-only', action='store_true', default=True,
                         help='Run in vision-only mode (simulation) - default: True')
     parser.add_argument('--real-drone', action='store_true', default=False,
                         help='Connect to real drone (overrides --vision-only)')
+    parser.add_argument('--no-web-ui', action='store_true', default=False,
+                        help='Disable web UI (speech control only)')
+    parser.add_argument('--web-only', action='store_true', default=False,
+                        help='Run web UI only (no speech control)')
     
     args = parser.parse_args()
     
-    # Determine vision_only mode
-    vision_only = not args.real_drone  # If real_drone is True, vision_only is False
+    # Determine modes
+    vision_only = not args.real_drone
+    enable_web_ui = not args.no_web_ui
+    web_only = args.web_only
     
-    print(f"🤖 Mode: {'VISION ONLY (Simulation)' if vision_only else 'REAL DRONE'}")
+    print(f"🤖 Drone Mode: {'VISION ONLY (Simulation)' if vision_only else 'REAL DRONE'}")
+    print(f"🌐 Web UI: {'ENABLED' if enable_web_ui else 'DISABLED'}")
+    print(f"🎙️ Speech Control: {'DISABLED' if web_only else 'ENABLED'}")
     
-    # Check environment variables
-    required_vars = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY']
-    missing_vars = [var for var in required_vars if not os.getenv(var)]
+    # Check environment variables for speech control
+    if not web_only:
+        required_vars = ['AZURE_OPENAI_ENDPOINT', 'AZURE_OPENAI_API_KEY']
+        missing_vars = [var for var in required_vars if not os.getenv(var)]
+        
+        if missing_vars:
+            logger.error(f"❌ Missing environment variables for speech control: {missing_vars}")
+            logger.info("💡 Set them with:")
+            for var in missing_vars:
+                logger.info(f"   export {var}='your-value'")
+            
+            if not enable_web_ui:
+                return
+            else:
+                logger.info("🌐 Continuing with web UI only...")
+                web_only = True
     
-    if missing_vars:
-        logger.error(f"❌ Missing environment variables: {missing_vars}")
-        logger.info("💡 Set them with:")
-        for var in missing_vars:
-            logger.info(f"   export {var}='your-value'")
-        return
-    
-    # Create agent with specified mode
-    agent = RealtimeDroneAgent(vision_only=vision_only)
+    # Create agent with specified modes
+    agent = WebEnabledDroneAgent(vision_only=vision_only, enable_web_ui=enable_web_ui)
     
     try:
-        # Connect to realtime API
-        if await agent.connect_realtime():
-            # Start real-time control
-            await agent.start_realtime_control()
-        else:
-            logger.error("❌ Failed to connect to realtime API")
-            
+        # Connect to realtime API if speech control is enabled
+        if not web_only:
+            if not await agent.connect_realtime():
+                logger.error("❌ Failed to connect to realtime API")
+                if not enable_web_ui:
+                    return
+                else:
+                    logger.info("🌐 Continuing with web UI only...")
+        
+        # Start hybrid or web-only control
+        await agent.start_hybrid_control()
+        
     except Exception as e:
         logger.error(f"❌ Main error: {e}")
 
 if __name__ == "__main__":
-    print("🚁🎙️ GPT-4o Realtime Drone Agent")
-    print("=" * 50)
+    print("🚁🎙️🌐 Web-enabled GPT-4o Realtime Drone Agent")
+    print("=" * 60)
     print()
     print("📋 SETUP INSTRUCTIONS:")
     print("1. Install dependencies:")
-    print("   pip install websockets pyaudio opencv-python numpy")
-    print("2. Set environment variables:")
+    print("   pip install websockets pyaudio opencv-python numpy python-socketio aiohttp aiohttp-cors")
+    print("2. Set environment variables (for speech control):")
     print("   export AZURE_OPENAI_ENDPOINT='https://your-resource.openai.azure.com'")
     print("   export AZURE_OPENAI_API_KEY='your-api-key'")
     print("   export AZURE_OPENAI_REALTIME_DEPLOYMENT='gpt-4o-realtime-preview'")
-    print("3. Make sure you have:")
-    print("   • Microphone and speakers connected")
-    print("   • Tello drone (for real drone mode)")
+    print("3. Start web UI (in another terminal):")
+    print("   cd webui && npm install && npm start")
     print()
     print("🚀 USAGE:")
-    print("   • Vision Only (Safe Simulation):  python autonomous_realtime_drone_agent.py")
-    print("   • Real Drone Mode:               python autonomous_realtime_drone_agent.py --real-drone")
+    print("   • Full Hybrid Mode:     python web_drone_agent.py")
+    print("   • Web UI Only:          python web_drone_agent.py --web-only")
+    print("   • Real Drone Mode:      python web_drone_agent.py --real-drone")
+    print("   • No Web UI:            python web_drone_agent.py --no-web-ui")
     print()
     
     try:
